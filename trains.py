@@ -1,6 +1,5 @@
 # following this tutorial:
 # https://pythonprogramming.net/pygame-python-3-part-1-intro/
-import enum
 import pygame
 
 backColor = (0, 127, 0)
@@ -8,18 +7,9 @@ railColor = (191, 191, 191)
 tieColor = (160, 82, 45)
 
 displayW = 800
-displayH = 600
-cellW = 50
-cellH = 20
-
-class CarKind (enum.Enum):
-	CAR_0 = 0
-	CAR_1 = 1
-	CAR_2 = 2
-	CAR_3 = 3
-	CAR_4 = 4
-	CAR_5 = 5
-	LOCOMOTIVE = 6
+displayH = 300
+cellW = 60
+cellH = 24
 
 class Car:
 	def __init__ (self, kind, row, col):
@@ -27,25 +17,15 @@ class Car:
 		self.row = row
 		self.row = col
 
-class TileKind (enum.Enum):
-	EMPTY = 0
-	L_R = 1
-	LD_RU = 2
-	LU_RD = 3
-	SWITCH_LD_0 = 4
-	SWITCH_LD_1 = 5
-	SWITCH_LU_0 = 6
-	SWITCH_LU_1 = 7
-	SWITCH_RD_0 = 8
-	SWITCH_RD_1 = 9
-	SWITCH_RU_0 = 10
-	SWITCH_RU_1 = 11
-	GOAL_0 = 12
-	GOAL_1 = 13
-	GOAL_2 = 14
-	GOAL_3 = 15
-	GOAL_4 = 16
-	GOAL_5 = 17
+class TileKind:
+	GOAL = 1
+	L = 8
+	R = 16
+	LD = 32
+	LU = 64
+	RD = 128
+	RU = 256
+	SWITCH = 512
 
 boardInit = [r"..............",
              r".V--p--q----U.",
@@ -57,109 +37,100 @@ rows = len (boardInit)
 cols = len (boardInit[0])
 
 boardX = (displayW - cellW * cols) // 2
-boardY = (displayH - cellH * cols) // 2
+boardY = (displayH - cellH * rows) // 2
 
 cars = []
-board = [[TileKind.EMPTY for col in range (cols)] for row in range (rows)]
+board = [[0 for col in range (cols)] for row in range (rows)]
 for row in range (rows):
 	for col in range (cols):
-		print (row, col)
 		cur = boardInit[row][col]
-		if cur == 't':
-			cars.append (Car (CarKind.LOCOMOTIVE, row, col))
-			cur = '.'
-		elif cur == 'u':
-			cars.append (Car (CarKind.CAR_0, row, col))
-			cur = '.'
-		elif cur == 'v':
-			cars.append (Car (CarKind.CAR_1, row, col))
-			cur = '.'
-		elif cur == 'w':
-			cars.append (Car (CarKind.CAR_2, row, col))
-			cur = '.'
-		elif cur == 'x':
-			cars.append (Car (CarKind.CAR_3, row, col))
-			cur = '.'
-		elif cur == 'y':
-			cars.append (Car (CarKind.CAR_4, row, col))
-			cur = '.'
-		elif cur == 'z':
-			cars.append (Car (CarKind.CAR_5, row, col))
-			cur = '.'
+
+		if cur >= 't' and cur <= 'z':
+			cars.append (Car (ord (cur) - ord ('t'), row, col))
+			cur = '-'
+
+		if cur >= 'U' and cur <= 'Z':
+			board[row][col] |= TileKind.GOAL * \
+			    (ord (cur) - ord ('U') + 1)
+			cur = '-'
+
 		if cur == '.':
-			board[row][col] = TileKind.EMPTY
+			pass
 		elif cur == '-':
-			board[row][col] = TileKind.L_R
+			board[row][col] |= TileKind.L | TileKind.R
 		elif cur == '/':
-			board[row][col] = TileKind.LD_RU
+			board[row][col] |= TileKind.LD | TileKind.RU
 		elif cur == '\\':
-			board[row][col] = TileKind.LU_RD
+			board[row][col] |= TileKind.LU | TileKind.RD
 		elif cur == 'p':
-			board[row][col] = TileKind.SWITCH_LD_0
+			board[row][col] |= TileKind.L | TileKind.R | TileKind.LD
 		elif cur == 'b':
-			board[row][col] = TileKind.SWITCH_LU_0
+			board[row][col] |= TileKind.L | TileKind.R | TileKind.LU
 		elif cur == 'q':
-			board[row][col] = TileKind.SWITCH_RD_0
+			board[row][col] |= TileKind.L | TileKind.R | TileKind.RD
 		elif cur == 'd':
-			board[row][col] = TileKind.SWITCH_RU_0
-		elif cur == 'U':
-			board[row][col] = TileKind.GOAL_0
-		elif cur == 'V':
-			board[row][col] = TileKind.GOAL_1
-		elif cur == 'W':
-			board[row][col] = TileKind.GOAL_2
-		elif cur == 'X':
-			board[row][col] = TileKind.GOAL_3
-		elif cur == 'Y':
-			board[row][col] = TileKind.GOAL_4
-		elif cur == 'Z':
-			board[row][col] = TileKind.GOAL_5
-		else:
-			assert (False)
+			board[row][col] |= TileKind.L | TileKind.R | TileKind.RU
 
 pygame.init ()
 
 display = pygame.display.set_mode ((displayW, displayH))
+layer = []
+for i in range (3):
+	layer.append (pygame.Surface ((displayW, displayH)))
+	layer[-1].set_colorkey ((0, 0, 0))
 pygame.display.set_caption ('Trains')
 
 clock = pygame.time.Clock ()
 
+def drawRail0 (x, y):
+	for i in range (3):
+		pygame.draw.rect (layer[2], tieColor,
+		    (x + 2 + i * 10, y + 10, 6, 9), 0)
+	pygame.draw.lines (layer[1], railColor, False,
+	    [(x, y + 10), (x + 29, y + 10)], 2)
+	pygame.draw.lines (layer[1], railColor, False,
+	    [(x, y + 15), (x + 29, y + 15)], 2)
+
+def drawRail1 (x, y):
+	for i in range (3):
+		pygame.draw.rect (layer[2], tieColor,
+		    (x + 2 + i * 10, y + 10 - 1 - i * 4, 6, 9), 0)
+	pygame.draw.lines (layer[1], railColor, False,
+	    [(x, y + 10 + 0), (x + 29, y + 10 - 11)], 2)
+	pygame.draw.lines (layer[1], railColor, False,
+	    [(x, y + 15 + 0), (x + 29, y + 15 - 11)], 2)
+
+def drawRail2 (x, y):
+	for i in range (3):
+		pygame.draw.rect (layer[2], tieColor,
+		    (x + 2 + i * 10, y + 10 - 9 + i * 4, 6, 9), 0)
+	pygame.draw.lines (layer[1], railColor, False,
+	    [(x, y + 10 - 11), (x + 29, y + 10 + 0)], 2)
+	pygame.draw.lines (layer[1], railColor, False,
+	    [(x, y + 15 - 11), (x + 29, y + 15 + 0)], 2)
+
 def drawTile (x, y, kind):
-	if kind == TileKind.EMPTY:
-		pass
-	elif kind == TileKind.L_R:
-		for i in range (5):
-			pygame.draw.rect (display, tieColor,
-			    (x + 3 + i * 10, y + 10, 4, 9), 0)
-		pygame.draw.lines (display, railColor, False,
-		    [(x, y + 10), (x + 49, y + 10)], 2)
-		pygame.draw.lines (display, railColor, False,
-		    [(x, y + 15), (x + 49, y + 15)], 2)
-	elif kind == TileKind.LD_RU:
-		for i in range (5):
-			pygame.draw.rect (display, tieColor,
-			    (x + 3 + i * 10, y + 10 + 8 - i * 4, 4, 9), 0)
-		pygame.draw.lines (display, railColor, False,
-		    [(x, y + 10 + 10), (x + 49, y + 10 - 10)], 2)
-		pygame.draw.lines (display, railColor, False,
-		    [(x, y + 15 + 10), (x + 49, y + 15 - 10)], 2)
-	elif kind == TileKind.LU_RD:
-		for i in range (5):
-			pygame.draw.rect (display, tieColor,
-			    (x + 3 + i * 10, y + 10 - 8 + i * 4, 4, 9), 0)
-		pygame.draw.lines (display, railColor, False,
-		    [(x, y + 10 - 10), (x + 49, y + 10 + 10)], 2)
-		pygame.draw.lines (display, railColor, False,
-		    [(x, y + 15 - 10), (x + 49, y + 15 + 10)], 2)
-	else:
-		pass
+	if kind & TileKind.L:
+		drawRail0 (x + 0, y + 0)
+	if kind & TileKind.R:
+		drawRail0 (x + 30, y + 0)
+	if kind & TileKind.LD:
+		drawRail1 (x + 0, y + 12)
+	if kind & TileKind.RU:
+		drawRail1 (x + 30, y + 0)
+	if kind & TileKind.LU:
+		drawRail2 (x + 0, y + 0)
+	if kind & TileKind.RD:
+		drawRail2 (x + 30, y + 12)
 
 def draw ():
-	display.fill (backColor)
+	layer[2].fill (backColor)
 	for row in range (rows):
 		for col in range (cols):
 			drawTile (boardX + col * cellW, boardY + row * cellH,
 			    board[row][col])
+	for i in range (3)[::-1]:
+		display.blit (layer[i], (0, 0))
 
 toExit = False
 while not toExit:
