@@ -3,22 +3,23 @@
 import pygame
 
 backColor = (0, 127, 0)
-gridColor = (0, 95, 0)
+gridColor = (0, 111, 0)
 railColor = (191, 191, 191)
-tieColor = (160, 82, 45)
-wheelColor = (223, 223, 223)
-platformColor = (159, 159, 159)
-carColor = [(175, 105, 238), (191, 63, 63), (63, 191, 63), (63, 63, 191),
+tieColor = (180, 112, 85)
+passiveColor = (191, 191, 255)
+activeColor = (255, 255, 159)
+carColor = [(191, 105, 238), (191, 63, 63), (63, 191, 63), (63, 63, 191),
     (127, 127, 63), (127, 63, 127), (63, 127, 127)]
 
-displayW = 800
-displayH = 300
-cellW = 60
-cellH = 24
+displayW = 1100
+displayH = 450
+cellW = 90
+cellH = 30
 
 class Car:
 	def __init__ (self, kind, row, col):
 		self.kind = kind
+		self.active = False
 		self.row = row
 		self.col = col
 
@@ -92,55 +93,68 @@ clock = pygame.time.Clock ()
 def drawRail0 (x, y):
 	for i in range (3):
 		pygame.draw.rect (layer[2], tieColor,
-		    (x + 2 + i * 10, y + 10, 6, 9))
-	pygame.draw.line (layer[1], railColor,
-	    (x, y + 10), (x + 29, y + 10), 2)
-	pygame.draw.line (layer[1], railColor,
-	    (x, y + 15), (x + 29, y + 15), 2)
+		    (x + 2 + i * cellW // 6, y + 10,
+		    cellW // 9, cellH // 5 * 2))
+	for j in range (2):
+		pygame.draw.line (layer[1], railColor,
+		    (x, y + 10 + j * 7),
+		    (x + cellW // 2 - 1, y + 10 + j * 7), 3)
 
 def drawRail1 (x, y):
 	for i in range (3):
 		pygame.draw.rect (layer[2], tieColor,
-		    (x + 2 + i * 10, y + 10 - 1 - i * 4, 6, 9))
-	pygame.draw.line (layer[1], railColor,
-	    (x, y + 10 + 0), (x + 29, y + 10 - 11), 2)
-	pygame.draw.line (layer[1], railColor,
-	    (x, y + 15 + 0), (x + 29, y + 15 - 11), 2)
+		    (x + 2 + i * cellW // 6,
+		    y + 9 + (0 - i) * cellH // 6,
+		    cellW // 9, cellH // 5 * 2))
+	for j in range (2):
+		pygame.draw.line (layer[1], railColor,
+		    (x, y + 10 + j * 7 + 0),
+		    (x + cellW // 2 - 1, y + 10 + j * 7 - cellH // 2 + 1), 3)
 
 def drawRail2 (x, y):
 	for i in range (3):
 		pygame.draw.rect (layer[2], tieColor,
-		    (x + 2 + i * 10, y + 10 - 9 + i * 4, 6, 9))
-	pygame.draw.line (layer[1], railColor,
-	    (x, y + 10 - 11), (x + 29, y + 10 + 0), 2)
-	pygame.draw.line (layer[1], railColor,
-	    (x, y + 15 - 11), (x + 29, y + 15 + 0), 2)
+		    (x + 2 + i * cellW // 6,
+		    y + 9 + (i - 2) * cellH // 6,
+		    cellW // 9, cellH // 5 * 2))
+	for j in range (2):
+		pygame.draw.line (layer[1], railColor,
+		    (x, y + 10 + j * 7 - cellH // 2 + 1),
+		    (x + cellW // 2 - 1, y + 10 + j * 7 + 0), 3)
 
 def drawGoal (x, y, c):
 	pygame.draw.rect (layer[2], carColor[c],
-	    (x + 5, y + 19, 49, 4))
+	    (x + 5, y + cellH // 5 * 4 - 1, cellW - 10, cellH // 5))
 
 def drawTile (x, y, kind):
 	if kind & TileKind.L:
 		drawRail0 (x + 0, y + 0)
 	if kind & TileKind.R:
-		drawRail0 (x + 30, y + 0)
+		drawRail0 (x + cellW // 2, y + 0)
 	if kind & TileKind.LD:
-		drawRail1 (x + 0, y + 12)
+		drawRail1 (x + 0, y + cellH // 2)
 	if kind & TileKind.RU:
-		drawRail1 (x + 30, y + 0)
+		drawRail1 (x + cellW // 2, y + 0)
 	if kind & TileKind.LU:
 		drawRail2 (x + 0, y + 0)
 	if kind & TileKind.RD:
-		drawRail2 (x + 30, y + 12)
+		drawRail2 (x + cellW // 2, y + cellH // 2)
 	if kind & (TileKind.GOAL * 7):
 		drawGoal (x, y, kind & 7)
 
-def drawCar (x, y, kind):
-	pygame.draw.circle (layer[0], wheelColor, (x + 15, y + 11), 5)
-	pygame.draw.circle (layer[0], wheelColor, (x + 45, y + 11), 5)
-	pygame.draw.rect (layer[0], platformColor, (x + 5, y + 7, 49, 3))
-	pygame.draw.rect (layer[0], carColor[kind], (x + 3, y - 7, 53, 14))
+def drawCar (car):
+	x = boardX + car.col * cellW
+	y1 = boardY + car.row * cellH
+	y2 = boardY + car.row * cellH
+	curColor = activeColor if car.active else passiveColor
+	pygame.draw.circle (layer[0], curColor,
+	    (x + cellW // 4 * 1, (y1 * 3 + y2 * 1) // 4 + 8), 10)
+	pygame.draw.circle (layer[0], curColor,
+	    (x + cellW // 4 * 3, (y1 * 1 + y2 * 3) // 4 + 8), 10)
+	pygame.draw.line (layer[0], curColor,
+	    (x + 5, y1 + 6), (x + cellW - 6, y2 + 6), 4)
+	pygame.draw.line (layer[0], carColor[car.kind],
+	    (x + 3, y1 - 4), (x + cellW - 4, y2 - 4), 18)
 
 def drawGrid ():
 	for row in range (rows):
@@ -149,28 +163,41 @@ def drawGrid ():
 				pygame.draw.rect (layer[2], gridColor,
 				    (boardX + col * cellW + 1,
 				    boardY + row * cellH + 1,
-				    cellW - 2, cellH - 2), 1)
+				    cellW - 2, cellH - 2), 3)
 
 def draw ():
 	layer[2].fill (backColor)
-	drawGrid ()
+#	drawGrid ()
 	for row in range (rows):
 		for col in range (cols):
 			drawTile (boardX + col * cellW, boardY + row * cellH,
 			    board[row][col])
 	for car in cars:
-		drawCar (boardX + car.col * cellW, boardY + car.row * cellH,
-		    car.kind)
+		drawCar (car)
 	for i in range (3)[::-1]:
 		display.blit (layer[i], (0, 0))
 
+def doMagnet (row, col, level):
+	pass
+
+def updateMagnet ():
+	for car in cars:
+		car.active = False
+
+	for car0 in cars:
+		if car0.kind == 0:
+			car0.active = True
+			doMagnet (car0.row, car0.col, magnet)
+
 toExit = False
+magnet = 1
 while not toExit:
 	for event in pygame.event.get ():
 		print (event)
 		if event.type == pygame.QUIT:
 			toExit = True
 
+	updateMagnet ()
 	draw ()
 	pygame.display.update ()
 	clock.tick (60)
