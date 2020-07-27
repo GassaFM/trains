@@ -167,6 +167,8 @@ def drawGrid ():
 
 def draw ():
 	layer[2].fill (backColor)
+	layer[1].fill ((0, 0, 0))
+	layer[0].fill ((0, 0, 0))
 #	drawGrid ()
 	for row in range (rows):
 		for col in range (cols):
@@ -189,6 +191,12 @@ def updateMagnet ():
 			car0.active = True
 			doMagnet (car0.row, car0.col, magnet)
 
+def moveLeft (car):
+	car.col -= 1
+
+def moveRight (car):
+	car.col += 1
+
 toExit = False
 magnet = 1
 while not toExit:
@@ -196,6 +204,19 @@ while not toExit:
 		print (event)
 		if event.type == pygame.QUIT:
 			toExit = True
+		elif event.type == pygame.KEYDOWN:
+			if event.key == pygame.K_LEFT:
+				for car0 in cars:
+					if car0.kind == 0:
+						moveLeft (car0)
+			elif event.key == pygame.K_RIGHT:
+				for car0 in cars:
+					if car0.kind == 0:
+						moveRight (car0)
+			elif event.key == pygame.K_UP:
+				magnet = min (6, magnet + 1)
+			elif event.key == pygame.K_DOWN:
+				magnet = max (0, magnet - 1)
 
 	updateMagnet ()
 	draw ()
