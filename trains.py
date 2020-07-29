@@ -5,6 +5,7 @@ import pygame
 backColor = (0, 127, 0)
 gridColor = (0, 111, 0)
 railColor = (191, 191, 191)
+darkRailColor = (127, 127, 127)
 tieColor = (180, 112, 85)
 passiveColor = (191, 191, 255)
 activeColor = (255, 255, 159)
@@ -134,35 +135,38 @@ pygame.display.set_caption ('Trains')
 
 clock = pygame.time.Clock ()
 
-def drawRail0 (x, y):
+def drawRail0 (x, y, is_active):
 	for i in range (3):
 		pygame.draw.rect (layer[2], tieColor,
 		    (x + 2 + i * cellW // 6, y + 10,
 		    cellW // 9, cellH // 5 * 2))
 	for j in range (2):
-		pygame.draw.line (layer[1], railColor,
+		pygame.draw.line (layer[0 if is_active else 1],
+		    railColor if is_active else darkRailColor,
 		    (x, y + 10 + j * 7),
 		    (x + cellW // 2 - 1, y + 10 + j * 7), 3)
 
-def drawRail1 (x, y):
+def drawRail1 (x, y, is_active):
 	for i in range (3):
 		pygame.draw.rect (layer[2], tieColor,
 		    (x + 2 + i * cellW // 6,
 		    y + 9 + (0 - i) * cellH // 6,
 		    cellW // 9, cellH // 5 * 2))
 	for j in range (2):
-		pygame.draw.line (layer[1], railColor,
+		pygame.draw.line (layer[0 if is_active else 1],
+		    railColor if is_active else darkRailColor,
 		    (x, y + 10 + j * 7 + 0),
 		    (x + cellW // 2 - 1, y + 10 + j * 7 - cellH // 2 + 1), 3)
 
-def drawRail2 (x, y):
+def drawRail2 (x, y, is_active):
 	for i in range (3):
 		pygame.draw.rect (layer[2], tieColor,
 		    (x + 2 + i * cellW // 6,
 		    y + 9 + (i - 2) * cellH // 6,
 		    cellW // 9, cellH // 5 * 2))
 	for j in range (2):
-		pygame.draw.line (layer[1], railColor,
+		pygame.draw.line (layer[0 if is_active else 1],
+		    railColor if is_active else darkRailColor,
 		    (x, y + 10 + j * 7 - cellH // 2 + 1),
 		    (x + cellW // 2 - 1, y + 10 + j * 7 + 0), 3)
 
@@ -170,39 +174,45 @@ def drawGoal (x, y, c):
 	pygame.draw.rect (layer[2], carColor[c],
 	    (x + 5, y + cellH // 5 * 4 - 1, cellW - 10, cellH // 5))
 
-def drawTile (x, y, kind):
+def drawTile (row, col):
+	x = boardX + col * cellW
+	y = boardY + row * cellH
+	kind = board[row][col]
+	if kind > 0:
+		left = dirLeft (row, col)
+		right = dirRight (row, col)
 	if kind & TileKind.L:
-		drawRail0 (x + 0, y + 0)
+		drawRail0 (x + 0, y + 0, left == 0)
 	if kind & TileKind.R:
-		drawRail0 (x + cellW // 2, y + 0)
+		drawRail0 (x + cellW // 2, y + 0, right == 0)
 	if kind & TileKind.LD:
-		drawRail1 (x + 0, y + cellH // 2)
+		drawRail1 (x + 0, y + cellH // 2, left == +1)
 	if kind & TileKind.RU:
-		drawRail1 (x + cellW // 2, y + 0)
+		drawRail1 (x + cellW // 2, y + 0, right == -1)
 	if kind & TileKind.LU:
-		drawRail2 (x + 0, y + 0)
+		drawRail2 (x + 0, y + 0, left == -1)
 	if kind & TileKind.RD:
-		drawRail2 (x + cellW // 2, y + cellH // 2)
+		drawRail2 (x + cellW // 2, y + cellH // 2, right == +1)
 	if kind & (TileKind.GOAL * 7):
 		drawGoal (x, y, kind & 7)
 
 def drawCar (car):
 	x = boardX + car.col * cellW
 	y1 = boardY + car.row * cellH
-	y1 += dirLeft (car.row, car.col) * cellH // 2
+	y1 += dirLeft (car.row, car.col) * cellH // 4
 	y2 = boardY + car.row * cellH
-	y2 += dirRight (car.row, car.col) * cellH // 2
+	y2 += dirRight (car.row, car.col) * cellH // 4
 	curColor = activeColor if car.active else passiveColor
 	pygame.draw.circle (layer[0], curColor,
-	    (x + cellW // 4 * 1, (y1 * 3 + y2 * 1) // 4 + 8), 10)
+	    (x + cellW // 4 * 1, (y1 * 2 + y2 * 0) // 2 + 8), 10)
 	pygame.draw.circle (layer[0], curColor,
-	    (x + cellW // 4 * 3, (y1 * 1 + y2 * 3) // 4 + 8), 10)
+	    (x + cellW // 4 * 3, (y1 * 0 + y2 * 2) // 2 + 8), 10)
 	pygame.draw.line (layer[0], curColor,
-	    (x + 5, (y1 * 17 + y2 * 1) // 18 + 6),
-	    (x + cellW - 6, (y1 * 1 + y2 * 17) // 18 + 6), 4)
+	    (x + 5, (y1 * 32 + y2 * -9) // 23 + 6),
+	    (x + cellW - 6, (y1 * -9 + y2 * 32) // 23 + 6), 4)
 	pygame.draw.line (layer[0], carColor[car.kind],
-	    (x + 3, (y1 * 17 + y2 * 1) // 18 - 4),
-	    (x + cellW - 4, (y1 * 1 + y2 * 17) // 18 - 4), 18)
+	    (x + 3, (y1 * 32 + y2 * -9) // 23 - 4),
+	    (x + cellW - 4, (y1 * -9 + y2 * 32) // 23 - 4), 18)
 
 def drawGrid ():
 	for row in range (rows):
@@ -220,8 +230,7 @@ def draw ():
 #	drawGrid ()
 	for row in range (rows):
 		for col in range (cols):
-			drawTile (boardX + col * cellW, boardY + row * cellH,
-			    board[row][col])
+			drawTile (row, col)
 	for car in cars:
 		drawCar (car)
 	for i in range (3)[::-1]:
