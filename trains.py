@@ -32,6 +32,8 @@ class TileKind:
 	RD = 128
 	RU = 256
 	SWITCH = 512
+	L_SWITCH = 1024
+	R_SWITCH = 2048
 
 boardInit = [r"..............",
              r".V--p--q----U.",
@@ -46,13 +48,19 @@ boardX = (displayW - cellW * cols) // 2
 boardY = (displayH - cellH * rows) // 2
 
 cars = []
+rootCar = None
 board = [[0 for col in range (cols)] for row in range (rows)]
+carLink = [[None for col in range (cols)] for row in range (rows)]
 for row in range (rows):
 	for col in range (cols):
 		cur = boardInit[row][col]
 
 		if cur >= 't' and cur <= 'z':
-			cars.append (Car (ord (cur) - ord ('t'), row, col))
+			car = Car (ord (cur) - ord ('t'), row, col)
+			cars.append (car)
+			carLink[row][col] = car
+			if cur == 't':
+				rootCar = car
 			cur = '-'
 
 		if cur >= 'U' and cur <= 'Z':
@@ -69,15 +77,51 @@ for row in range (rows):
 		elif cur == '\\':
 			board[row][col] |= TileKind.LU | TileKind.RD
 		elif cur == 'p':
-			board[row][col] |= TileKind.L | TileKind.R | TileKind.LD
+			board[row][col] |= TileKind.L | TileKind.R
+			board[row][col] |= TileKind.LD | TileKind.L_SWITCH
 		elif cur == 'b':
-			board[row][col] |= TileKind.L | TileKind.R | TileKind.LU
+			board[row][col] |= TileKind.L | TileKind.R
+			board[row][col] |= TileKind.LU | TileKind.L_SWITCH
 		elif cur == 'q':
-			board[row][col] |= TileKind.L | TileKind.R | TileKind.RD
+			board[row][col] |= TileKind.L | TileKind.R
+			board[row][col] |= TileKind.RD | TileKind.R_SWITCH
 		elif cur == 'd':
-			board[row][col] |= TileKind.L | TileKind.R | TileKind.RU
+			board[row][col] |= TileKind.L | TileKind.R
+			board[row][col] |= TileKind.RU | TileKind.R_SWITCH
 		else:
 			assert (False)
+
+def dirLeft (row, col):
+	cur = board[row][col]
+	if (cur & TileKind.L) > 0 and \
+	    ((cur & TileKind.SWITCH) == 0 or (cur & TileKind.L_SWITCH == 0)):
+		return 0
+	if (cur & TileKind.LD) > 0 and \
+	    ((cur & TileKind.SWITCH) > 0 or (cur & TileKind.L) == 0):
+		return +1
+	if (cur & TileKind.LU) > 0 and \
+	    ((cur & TileKind.SWITCH) > 0 or (cur & TileKind.L) == 0):
+		return -1
+	assert (False)
+
+def dirRight (row, col):
+	cur = board[row][col]
+	if (cur & TileKind.R) > 0 and \
+	    ((cur & TileKind.SWITCH) == 0 or (cur & TileKind.R_SWITCH == 0)):
+		return 0
+	if (cur & TileKind.RD) > 0 and \
+	    ((cur & TileKind.SWITCH) > 0 or (cur & TileKind.R) == 0):
+		return +1
+	if (cur & TileKind.RU) > 0 and \
+	    ((cur & TileKind.SWITCH) > 0 or (cur & TileKind.R) == 0):
+		return -1
+	assert (False)
+
+def coordLeft (row, col):
+	return row + dirLeft (row, col), col - 1
+
+def coordRight (row, col):
+	return row + dirRight (row, col), col + 1
 
 pygame.init ()
 
@@ -145,16 +189,20 @@ def drawTile (x, y, kind):
 def drawCar (car):
 	x = boardX + car.col * cellW
 	y1 = boardY + car.row * cellH
+	y1 += dirLeft (car.row, car.col) * cellH // 2
 	y2 = boardY + car.row * cellH
+	y2 += dirRight (car.row, car.col) * cellH // 2
 	curColor = activeColor if car.active else passiveColor
 	pygame.draw.circle (layer[0], curColor,
 	    (x + cellW // 4 * 1, (y1 * 3 + y2 * 1) // 4 + 8), 10)
 	pygame.draw.circle (layer[0], curColor,
 	    (x + cellW // 4 * 3, (y1 * 1 + y2 * 3) // 4 + 8), 10)
 	pygame.draw.line (layer[0], curColor,
-	    (x + 5, y1 + 6), (x + cellW - 6, y2 + 6), 4)
+	    (x + 5, (y1 * 17 + y2 * 1) // 18 + 6),
+	    (x + cellW - 6, (y1 * 1 + y2 * 17) // 18 + 6), 4)
 	pygame.draw.line (layer[0], carColor[car.kind],
-	    (x + 3, y1 - 4), (x + cellW - 4, y2 - 4), 18)
+	    (x + 3, (y1 * 17 + y2 * 1) // 18 - 4),
+	    (x + cellW - 4, (y1 * 1 + y2 * 17) // 18 - 4), 18)
 
 def drawGrid ():
 	for row in range (rows):
@@ -182,20 +230,91 @@ def draw ():
 def doMagnet (row, col, level):
 	pass
 
-def updateMagnet ():
+def clearMagnet ():
 	for car in cars:
 		car.active = False
 
-	for car0 in cars:
-		if car0.kind == 0:
-			car0.active = True
-			doMagnet (car0.row, car0.col, magnet)
+def updateMagnet (car, magnet_power):
+	car.active = True
+	row, col = car.row, car.col
+	for i in range (magnet_power):
+		row, col = coordLeft (row, col)
+		if carLink[row][col]:
+			carLink[row][col].active = True
+		else:
+			break
+	row, col = car.row, car.col
+	for i in range (magnet_power):
+		row, col = coordRight (row, col)
+		if carLink[row][col]:
+			carLink[row][col].active = True
+		else:
+			break
 
-def moveLeft (car):
-	car.col -= 1
+def moveCar (car, row, col):
+	carLink[car.row][car.col] = None
+	car.row, car.col = row, col
+	carLink[car.row][car.col] = car
 
-def moveRight (car):
-	car.col += 1
+def moveLeft (car, magnet_power):
+	next_row, next_col = coordLeft (car.row, car.col)
+	if board[next_row][next_col] == 0:
+		return False
+	if next_row + dirRight (next_row, next_col) != car.row:
+		return False
+	if not carLink[next_row][next_col] or \
+	    moveLeft (carLink[next_row][next_col], 0):
+		moveCar (car, next_row, next_col)
+		if magnet_power > 0:
+			prev_row, prev_col = coordRight (car.row, car.col)
+			prev_row, prev_col = coordRight (prev_row, prev_col)
+			if carLink[prev_row][prev_col]:
+				moveLeft (carLink[prev_row][prev_col], \
+				    magnet_power - 1)
+		return True
+	return False
+
+def moveRight (car, magnet_power):
+	next_row, next_col = coordRight (car.row, car.col)
+	if board[next_row][next_col] == 0:
+		return False
+	if next_row + dirLeft (next_row, next_col) != car.row:
+		return False
+	if not carLink[next_row][next_col] or \
+	    moveRight (carLink[next_row][next_col], 0):
+		moveCar (car, next_row, next_col)
+		if magnet_power > 0:
+			prev_row, prev_col = coordLeft (car.row, car.col)
+			prev_row, prev_col = coordLeft (prev_row, prev_col)
+			if carLink[prev_row][prev_col]:
+				moveRight (carLink[prev_row][prev_col], \
+				    magnet_power - 1)
+		return True
+	return False
+
+def toggleLeft (car):
+	next_row, next_col = coordLeft (car.row, car.col)
+	if board[next_row][next_col] == 0:
+		return False
+	if carLink[next_row][next_col]:
+		return toggleLeft (carLink[next_row][next_col])
+	elif (board[next_row][next_col] & TileKind.L_SWITCH) > 0 or \
+	    (board[next_row][next_col] & TileKind.R_SWITCH) > 0:
+		board[next_row][next_col] ^= TileKind.SWITCH
+		return True
+	return False
+
+def toggleRight (car):
+	next_row, next_col = coordRight (car.row, car.col)
+	if board[next_row][next_col] == 0:
+		return False
+	if carLink[next_row][next_col]:
+		return toggleRight (carLink[next_row][next_col])
+	elif (board[next_row][next_col] & TileKind.L_SWITCH) > 0 or \
+	    (board[next_row][next_col] & TileKind.R_SWITCH) > 0:
+		board[next_row][next_col] ^= TileKind.SWITCH
+		return True
+	return False
 
 toExit = False
 magnet = 1
@@ -206,19 +325,19 @@ while not toExit:
 			toExit = True
 		elif event.type == pygame.KEYDOWN:
 			if event.key == pygame.K_LEFT:
-				for car0 in cars:
-					if car0.kind == 0:
-						moveLeft (car0)
+				moveLeft (rootCar, magnet)
 			elif event.key == pygame.K_RIGHT:
-				for car0 in cars:
-					if car0.kind == 0:
-						moveRight (car0)
+				moveRight (rootCar, magnet)
 			elif event.key == pygame.K_UP:
 				magnet = min (6, magnet + 1)
 			elif event.key == pygame.K_DOWN:
 				magnet = max (0, magnet - 1)
+			elif event.key == pygame.K_SPACE:
+				toggleLeft (rootCar)
+				toggleRight (rootCar)
 
-	updateMagnet ()
+	clearMagnet ()
+	updateMagnet (rootCar, magnet)
 	draw ()
 	pygame.display.update ()
 	clock.tick (60)
