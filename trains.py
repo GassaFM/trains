@@ -42,6 +42,14 @@ boardInit = [r"..............",
              r".-d-v-u--b-t-.",
              r".............."]
 
+"""
+boardInit = [r"..............",
+             r".Uzq---t--puZ.",
+             r".Vy-bq--pd-vY.",
+             r".Wx---bd---wX.",
+             r".............."]
+"""
+
 rows = len (boardInit)
 cols = len (boardInit[0])
 
