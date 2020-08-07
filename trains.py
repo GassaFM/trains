@@ -36,11 +36,21 @@ class TileKind:
 	L_SWITCH = 1024
 	R_SWITCH = 2048
 
+boardInit = []
+with open ("level.txt", encoding='utf-8') as f:
+	rows, cols = map (int, f.readline ().split ())
+	print (rows, cols)
+	boardInit = []
+	for row in range (rows):
+		boardInit.append (f.readline ().strip ()[:cols])
+
+"""
 boardInit = [r"..............",
              r".V--p--q----U.",
              r".../....\.....",
              r".-d-v-u--b-t-.",
              r".............."]
+"""
 
 """
 boardInit = [r"..............",
@@ -52,6 +62,7 @@ boardInit = [r"..............",
 
 rows = len (boardInit)
 cols = len (boardInit[0])
+print (rows, cols)
 
 boardX = (displayW - cellW * cols) // 2
 boardY = (displayH - cellH * rows) // 2
